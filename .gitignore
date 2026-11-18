@@ -1,0 +1,33 @@
+# ==================== 文件哨兵（FolderSentinel）.gitignore ====================
+# 原则：仓库里只放“源代码和文档”，所有编译/运行时生成出来的东西都不进仓库。
+
+# ---- 编译产物 ----
+bin/
+obj/
+dist/
+out/
+publish/
+artifacts/
+
+# ---- Visual Studio / Rider / VS Code 的个人配置 ----
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ---- 测试运行结果 ----
+TestResults/
+[Tt]est[Rr]esult*/
+
+# ---- 程序运行时生成的数据（SQLite 数据库、日志、settings.json）----
+data/
+*.log
+
+# ---- 系统常见临时文件 ----
+*.tmp
+~$*
+Thumbs.db
+Desktop.ini

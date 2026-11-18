@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 目标框架：net10.0（核心库保持跨平台形态，只放纯逻辑，不碰界面） -->
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>FolderSentinel.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- SQLite 历史库：本项目唯一的第三方运行时依赖 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>
