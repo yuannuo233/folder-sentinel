@@ -13,15 +13,17 @@ internal static class LocStrings
     {
         // ---- 窗口与工具条 ----
         ["app.title"]            = "文件哨兵 —— 看看谁动了我的文件",
+        ["app.shortName"]        = "文件哨兵",
+        ["nav.events"]           = "事件监控",
+        ["nav.dirs"]             = "监控目录",
         ["toolbar.filterLabel"]  = "关键字过滤：",
         ["toolbar.filterTip"]    = "只显示路径包含关键字的事件（对实时和回看都生效）",
         ["toolbar.historyLabel"] = "按天回看：",
         ["toolbar.historyTip"]   = "选择日期，从数据库加载当天的全部记录",
         ["toolbar.backToLive"]   = "回到实时",
-        ["toolbar.languageLabel"] = "语言：",
+        ["toolbar.languageTip"]  = "切换界面语言（立即生效并记住选择）",
 
         // ---- 监控目录面板 ----
-        ["dir.group"]         = "监控目录",
         ["dir.add"]           = "添加目录",
         ["dir.remove"]        = "删除选中",
         ["dir.pickTitle"]     = "选择要监控的文件夹",
@@ -34,7 +36,6 @@ internal static class LocStrings
         ["dir.addFailed"]     = "无法添加目录：{0}",
 
         // ---- 事件列表 ----
-        ["events.group"] = "文件事件（最新在最上面）",
         ["col.time"]     = "时间",
         ["col.kind"]     = "类型",
         ["col.path"]     = "路径",
@@ -52,6 +53,11 @@ internal static class LocStrings
         ["status.history"]    = "回看模式：{0}",
         ["status.monitoring"] = "监控 {0} 个目录",
         ["status.recorded"]   = "本次运行已记录 {0} 条",
+
+        // ---- 空状态提示 ----
+        ["empty.live"]    = "还没有记录到任何文件事件。\n添加监控目录后，其他软件对文件的操作会实时出现在这里。",
+        ["empty.history"] = "这一天没有找到文件记录。",
+        ["empty.dirs"]    = "还没有监控目录。\n点击上方“添加目录”，开始守护你的文件夹。",
 
         // ---- 系统托盘 ----
         ["tray.tooltip"]     = "文件哨兵：正在守护你的文件",
@@ -75,15 +81,17 @@ internal static class LocStrings
     {
         // ---- Window & toolbar ----
         ["app.title"]             = "FolderSentinel — Who touched my files?",
+        ["app.shortName"]         = "FolderSentinel",
+        ["nav.events"]            = "Live events",
+        ["nav.dirs"]              = "Watched folders",
         ["toolbar.filterLabel"]   = "Filter: ",
         ["toolbar.filterTip"]     = "Show only events whose path contains the keyword (live view and history)",
         ["toolbar.historyLabel"]  = "Browse by day: ",
         ["toolbar.historyTip"]    = "Pick a date to load that day's records from the database",
         ["toolbar.backToLive"]    = "Back to live",
-        ["toolbar.languageLabel"] = "Language: ",
+        ["toolbar.languageTip"]   = "Switch UI language (applies immediately)",
 
         // ---- Watched folders panel ----
-        ["dir.group"]         = "Watched folders",
         ["dir.add"]           = "Add folder",
         ["dir.remove"]        = "Remove selected",
         ["dir.pickTitle"]     = "Choose a folder to watch",
@@ -96,7 +104,6 @@ internal static class LocStrings
         ["dir.addFailed"]     = "Cannot add folder: {0}",
 
         // ---- Event list ----
-        ["events.group"] = "File events (newest first)",
         ["col.time"]     = "Time",
         ["col.kind"]     = "Kind",
         ["col.path"]     = "Path",
@@ -114,6 +121,11 @@ internal static class LocStrings
         ["status.history"]    = "History: {0}",
         ["status.monitoring"] = "Watching {0} folder(s)",
         ["status.recorded"]   = "{0} events this session",
+
+        // ---- Empty states ----
+        ["empty.live"]    = "No events recorded yet.\nAdd watched folders and file activity from any program will appear here in real time.",
+        ["empty.history"] = "No file records found for this day.",
+        ["empty.dirs"]    = "No watched folders yet.\nClick \"Add folder\" above to start guarding your folders.",
 
         // ---- System tray ----
         ["tray.tooltip"]      = "FolderSentinel: guarding your files",

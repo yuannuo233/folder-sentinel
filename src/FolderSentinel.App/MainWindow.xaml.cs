@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using FolderSentinel.Core;
 using FolderSentinel.Core.Logging;
 using FolderSentinel.Core.Models;
@@ -11,15 +12,17 @@ using FolderSentinel.Core.Monitoring;
 using FolderSentinel.Core.Storage;
 using Microsoft.Win32;
 
-// 本项目同时启用了 WPF 和 WinForms（托盘图标用），
-// 两边都有 Application 和 MessageBox，用别名明确指定用 WPF 的版本。
+// 本项目同时启用了 WPF 和 WinForms（托盘图标用），两边都有 Application 和 MessageBox，
+// 用别名明确指定用 WPF 的版本；Color/SolidColorBrush 指定用 WPF.Media 的版本。
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
+using Color = System.Windows.Media.Color;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
 
 namespace FolderSentinel.App;
 
 /// <summary>
-/// 主窗口：左侧管理监控目录，右侧实时显示文件事件，还能按天回看历史；
+/// 主窗口：左侧导航栏（事件监控 / 监控目录），右侧卡片式内容区；
 /// 最小化后收进系统托盘继续监控。
 ///
 /// 【线程规则——本项目最重要的一条纪律】
@@ -31,6 +34,17 @@ public partial class MainWindow : Window
 {
     /// <summary>实时列表最多保留多少行（防止长时间运行把内存吃光；完整历史都在数据库里）。</summary>
     private const int MaxLiveRows = 2000;
+
+    // 状态胶囊上的小圆点：绿色 = 监控中，灰色 = 已停止（冻结后可安全复用）
+    private static readonly SolidColorBrush DotRunningBrush = MakeBrush(0x0F, 0x7B, 0x0F);
+    private static readonly SolidColorBrush DotIdleBrush = MakeBrush(0xA6, 0xB0, 0xBA);
+
+    private static SolidColorBrush MakeBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
 
     private readonly AppSettings _settings;
     private readonly ObservableCollection<DirectoryRow> _directories = new();
@@ -80,12 +94,15 @@ public partial class MainWindow : Window
         _liveView = CollectionViewSource.GetDefaultView(_liveRows);
         _liveView.Filter = row => MatchesKeyword((EventRow)row);
 
+        // 实时列表每变化一次（新事件进来 / 被裁剪），都检查要不要显示“空状态”提示
+        _liveRows.CollectionChanged += (sender, args) => UpdateEmptyState();
+
         // 图标：标题栏和托盘共用同一个“代码画出来”的图标
         Icon = AppIconFactory.CreateWindowIcon();
         InitTrayIcon();
 
-        // 恢复上次选择的语言（下拉框的选中项变化会触发 SelectionChanged，但语言相同会直接跳过）
-        LanguageBox.SelectedIndex = string.Equals(_settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        // 恢复上次选择的语言（下拉框选中项变化会触发 SelectionChanged，但语言相同会直接跳过）
+        LangBox.SelectedIndex = string.Equals(_settings.Language, "en-US", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
 
         // 订阅语言切换事件并手动刷新一次界面文字
         //（启动时的 SetLanguage 发生在订阅之前，不会自动触发，所以要手动调一次）
@@ -97,9 +114,8 @@ public partial class MainWindow : Window
         _logger.Info("程序启动完成。");
     }
 
-    // ==================== 界面绑定用的两个集合 ====================
+    // ==================== 界面绑定用的集合 ====================
 
-    public ObservableCollection<DirectoryRow> Directories => _directories;
     public ObservableCollection<EventRow> LiveRows => _liveRows;
 
     // ==================== 启动与关闭 ====================
@@ -109,6 +125,7 @@ public partial class MainWindow : Window
         LoadDirectoryListFromDatabase();
         _engine.Start();      // 从数据库读目录清单，逐个开始监控
         UpdateStatus();
+        UpdateEmptyState();
         _logger.Info("监控已开始。");
     }
 
@@ -149,9 +166,25 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
+    // ==================== 侧栏导航 ====================
+
+    /// <summary>切换页面：事件监控页 ↔ 监控目录页（由导航 RadioButton 的选中触发）。</summary>
+    private void NavRadio_Checked(object sender, RoutedEventArgs e)
+    {
+        // XAML 解析过程中首个导航项的 Checked 事件可能早于内容区元素创建完成，保险起见判空
+        if (PanelEvents == null || PanelDirs == null)
+        {
+            return;
+        }
+
+        var eventsSelected = ReferenceEquals(sender, NavEventsRadio);
+        PanelEvents.Visibility = eventsSelected ? Visibility.Visible : Visibility.Collapsed;
+        PanelDirs.Visibility = eventsSelected ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     // ==================== 监控目录管理 ====================
 
-    /// <summary>启动时从数据库把目录清单读出来，填到左侧列表。</summary>
+    /// <summary>启动时从数据库把目录清单读出来，填到列表。</summary>
     private void LoadDirectoryListFromDatabase()
     {
         foreach (var dir in _database.GetDirectories())
@@ -241,6 +274,7 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
         UpdateStatus();
+        UpdateEmptyState();
     }
 
     /// <summary>“删除选中”按钮：从列表和数据库里移除选中的目录（历史记录保留）。</summary>
@@ -265,6 +299,7 @@ public partial class MainWindow : Window
         _directories.Remove(row);
         _logger.Info($"用户移除监控目录：{row.Path}");
         UpdateStatus();
+        UpdateEmptyState();
     }
 
     // ==================== 引擎回调（后台线程！） ====================
@@ -286,10 +321,10 @@ public partial class MainWindow : Window
 
     private void OnEngineMessage(EngineMessageCode code, string detail)
     {
-        // 引擎提示消息：同样从后台线程转回界面线程，翻译成当前语言后显示在状态栏
+        // 引擎提示消息：同样从后台线程转回界面线程，翻译成当前语言后显示在状态胶囊里
         Dispatcher.InvokeAsync(() =>
         {
-            StatusText.Text = code switch
+            StatusPillText.Text = code switch
             {
                 EngineMessageCode.BufferOverflow => Loc.TF("msg.bufferOverflow", detail),
                 EngineMessageCode.DirMissing => Loc.TF("msg.dirMissing", detail),
@@ -356,6 +391,7 @@ public partial class MainWindow : Window
 
         EventGrid.ItemsSource = _historyRows;   // 切到回看列表
         UpdateStatus();
+        UpdateEmptyState();
     }
 
     /// <summary>回到实时模式：表格数据源换回实时列表（带关键字过滤）。</summary>
@@ -363,6 +399,7 @@ public partial class MainWindow : Window
     {
         EventGrid.ItemsSource = _liveView;
         UpdateStatus();
+        UpdateEmptyState();
     }
 
     /// <summary>关键字过滤规则：事件显示行里包含关键字就放行（重命名行里旧路径也在）。</summary>
@@ -378,9 +415,9 @@ public partial class MainWindow : Window
 
     // ==================== 语言切换 ====================
 
-    private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void LangBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (LanguageBox.SelectedItem is not ComboBoxItem item)
+        if (LangBox.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
@@ -401,21 +438,24 @@ public partial class MainWindow : Window
     {
         Title = Loc.T("app.title");
 
-        // 顶部工具条
+        // 侧栏
+        TitleText.Text = Loc.T("app.shortName");
+        NavEventsText.Text = Loc.T("nav.events");
+        NavDirsText.Text = Loc.T("nav.dirs");
+        LangBox.ToolTip = Loc.T("toolbar.languageTip");
+
+        // 事件页工具条
         FilterLabel.Text = Loc.T("toolbar.filterLabel");
         FilterBox.ToolTip = Loc.T("toolbar.filterTip");
         HistoryLabel.Text = Loc.T("toolbar.historyLabel");
         HistoryDatePicker.ToolTip = Loc.T("toolbar.historyTip");
         BackToLiveButton.Content = Loc.T("toolbar.backToLive");
-        LanguageLabel.Text = Loc.T("toolbar.languageLabel");
 
-        // 左侧目录面板
-        DirGroup.Header = Loc.T("dir.group");
+        // 目录页工具条
         AddDirButton.Content = Loc.T("dir.add");
         RemoveDirButton.Content = Loc.T("dir.remove");
 
-        // 右侧事件表格
-        EventsGroup.Header = Loc.T("events.group");
+        // 事件表格表头
         TimeColumn.Header = Loc.T("col.time");
         KindColumn.Header = Loc.T("col.kind");
         PathColumn.Header = Loc.T("col.path");
@@ -433,6 +473,7 @@ public partial class MainWindow : Window
         }
 
         UpdateStatus();
+        UpdateEmptyState();
     }
 
     private static void RefreshRowTranslations(IEnumerable<EventRow> rows)
@@ -512,8 +553,9 @@ public partial class MainWindow : Window
         Close();   // 走 OnClosing（放行）→ OnClosed（统一清理）
     }
 
-    // ==================== 状态栏 ====================
+    // ==================== 状态与空状态 ====================
 
+    /// <summary>刷新侧栏底部状态胶囊（模式 + 监控目录数 + 绿点）和事件页右上角的计数。</summary>
     private void UpdateStatus()
     {
         var enabledCount = 0;
@@ -529,7 +571,28 @@ public partial class MainWindow : Window
             ? Loc.TF("status.history", date.ToString("yyyy-MM-dd"))
             : Loc.T("status.live");
 
-        StatusText.Text = $"{mode} | {Loc.TF("status.monitoring", enabledCount)}";
+        StatusPillText.Text = $"{mode} | {Loc.TF("status.monitoring", enabledCount)}";
         CounterText.Text = Loc.TF("status.recorded", _liveRows.Count);
+        StatusDot.Fill = _engine.IsRunning ? DotRunningBrush : DotIdleBrush;
+    }
+
+    /// <summary>
+    /// 空状态提示：表格或列表没有内容时，在卡片正中显示灰字引导，
+    /// 实时 / 回看 / 目录三个场景各有各的文案。
+    /// </summary>
+    private void UpdateEmptyState()
+    {
+        if (EventEmpty != null)
+        {
+            var inHistoryMode = HistoryDatePicker?.SelectedDate is DateTime;
+            EventEmpty.Text = inHistoryMode ? Loc.T("empty.history") : Loc.T("empty.live");
+            var rowCount = inHistoryMode ? _historyRows.Count : _liveRows.Count;
+            EventEmpty.Visibility = rowCount == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (DirEmpty != null)
+        {
+            DirEmpty.Text = Loc.T("empty.dirs");
+            DirEmpty.Visibility = _directories.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 }
