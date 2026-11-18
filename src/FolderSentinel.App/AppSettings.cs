@@ -13,6 +13,9 @@ public sealed class AppSettings
     /// <summary>界面语言代码："zh-CN" 或 "en-US"。</summary>
     public string Language { get; set; } = "zh-CN";
 
+    /// <summary>审查修复（F-17）：历史事件保留天数，超过就清理（默认 30 天，防止 events 表无限膨胀）。</summary>
+    public int RetentionDays { get; set; } = 30;
+
     /// <summary>设置文件位置：数据目录\data\settings.json。</summary>
     private static string SettingsFilePath =>
         Path.Combine(SelfGuard.CreateDefault().DataDirectory, "settings.json");

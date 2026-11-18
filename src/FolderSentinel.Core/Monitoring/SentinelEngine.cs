@@ -49,6 +49,13 @@ public sealed class SentinelEngine : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _processTask;
     private Timer? _flushTimer;
+
+    // ============ 审查修复（F-7）：探头死亡自动重建 ============
+    // 探头出故障（目录被删、缓冲溢出）后 watcher 已不可靠。原来只报消息不处理，
+    // 目录恢复后监控就永远"哑"了。现在登记到 _deadMonitors，由 _retryTimer
+    // 每 60 秒尝试重建一次（目录回来了就自动接上；连续 5 次仍不存在则放弃并提示）。
+    private Timer? _retryTimer;
+    private readonly Dictionary<string, int> _deadMonitors = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
     /// <summary>数据库实例（界面用它做按天回看查询）。</summary>
@@ -85,6 +92,9 @@ public sealed class SentinelEngine : IDisposable
         // （修改事件要等 300ms 窗口安静后才发布，不能光靠新事件来叫醒。）
         _flushTimer = new Timer(_ => _signal.Release(), null, dueTime: 100, period: 100);
 
+        // 每 60 秒巡检一次：尝试重建之前故障死亡的探头
+        _retryTimer = new Timer(_ => TryReviveDeadMonitors(), null, dueTime: 30_000, period: 60_000);
+
         foreach (var dir in _database.GetDirectories())
         {
             if (dir.Enabled)
@@ -108,6 +118,8 @@ public sealed class SentinelEngine : IDisposable
         _cts.Cancel();
         _flushTimer?.Dispose();
         _flushTimer = null;
+        _retryTimer?.Dispose();
+        _retryTimer = null;
         try
         {
             _processTask?.Wait(TimeSpan.FromSeconds(5));
@@ -128,6 +140,7 @@ public sealed class SentinelEngine : IDisposable
                 monitor.Dispose();
             }
             _monitors.Clear();
+            _deadMonitors.Clear();
         }
         _logger?.Info("监控引擎已停止。");
     }
@@ -228,9 +241,14 @@ public sealed class SentinelEngine : IDisposable
                 monitor.EventDetected += OnRawEvent;
                 monitor.ErrorOccurred += message =>
                 {
-                    // 探头出故障：写日志 + 发消息代码给界面（界面翻译成当前语言提示用户）
+                    // 探头出故障：写日志 + 发消息代码给界面（界面翻译成当前语言提示用户）。
+                    // 审查修复（F-7）：故障的 watcher 不可靠，登记待重建，由 _retryTimer 恢复。
                     _logger?.Warn(message);
                     MessageRaised?.Invoke(EngineMessageCode.BufferOverflow, directory);
+                    lock (_monitorsLock)
+                    {
+                        _deadMonitors[directory] = 0;
+                    }
                 };
                 _monitors[directory] = monitor;
                 _logger?.Info($"开始监控目录：{directory}");
@@ -255,6 +273,62 @@ public sealed class SentinelEngine : IDisposable
                 _monitors.Remove(directory);
                 _logger?.Info($"停止监控目录：{directory}");
             }
+        }
+    }
+
+    /// <summary>
+    /// 审查修复（F-7）：巡检"死亡探头"，目录恢复存在就重建，连续 5 次仍不存在则放弃。
+    /// 在 _retryTimer 的线程池线程上运行；StopMonitor/StartMonitor 内部都有锁保护。
+    /// </summary>
+    private void TryReviveDeadMonitors()
+    {
+        if (!IsRunning)
+        {
+            return;
+        }
+
+        string[] pending;
+        lock (_monitorsLock)
+        {
+            pending = _deadMonitors.Keys.ToArray();
+        }
+        if (pending.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var directory in pending)
+        {
+            // 用户已经移除/暂停了这个目录：放弃重建
+            var record = _database.GetDirectories()
+                .FirstOrDefault(d => string.Equals(NormalizeDirectoryPath(d.Path), directory, StringComparison.OrdinalIgnoreCase));
+            if (record is null || !record.Enabled)
+            {
+                lock (_monitorsLock) _deadMonitors.Remove(directory);
+                continue;
+            }
+
+            // 目录还不存在：累计重试次数，连续 5 次（约 5 分钟）仍不存在则放弃并提示
+            if (!Directory.Exists(directory))
+            {
+                lock (_monitorsLock)
+                {
+                    int attempts = ++_deadMonitors[directory];
+                    if (attempts >= 5)
+                    {
+                        _deadMonitors.Remove(directory);
+                        MessageRaised?.Invoke(EngineMessageCode.DirMissing, directory);
+                        _logger?.Warn($"目录多次尝试重建失败，放弃：{directory}");
+                    }
+                }
+                continue;
+            }
+
+            // 目录回来了：清干净旧 watcher，重新派探头
+            lock (_monitorsLock) _deadMonitors.Remove(directory);
+            StopMonitor(directory);
+            StartMonitor(directory);
+            _logger?.Info($"目录恢复，监控已重建：{directory}");
         }
     }
 

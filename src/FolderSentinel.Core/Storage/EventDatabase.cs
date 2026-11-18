@@ -205,6 +205,21 @@ public sealed class EventDatabase : IDisposable
         }
     }
 
+    /// <summary>
+    /// 审查修复（F-17）：删除截止时间之前的历史事件（保留期清理，防止 events 表无限膨胀）。
+    /// 返回删除的行数。
+    /// </summary>
+    public int DeleteEventsBefore(DateTime utcCutoff)
+    {
+        lock (_lock)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = "DELETE FROM events WHERE ts_utc < @cutoff";
+            command.Parameters.AddWithValue("@cutoff", TimestampHelper.ToUnixMs(utcCutoff));
+            return command.ExecuteNonQuery();
+        }
+    }
+
     // ==================== 内部小工具 ====================
 
     /// <summary>空字符串统一存 NULL，数据更规整。</summary>

@@ -77,6 +77,16 @@ public partial class MainWindow : Window
             var dataDir = SelfGuard.CreateDefault().DataDirectory;
             _logger = new SimpleLogger(Path.Combine(dataDir, "sentinel.log"));
             _database = new EventDatabase(Path.Combine(dataDir, "sentinel.db"));
+
+            // 审查修复（F-17）：按保留天数清理历史事件（默认 30 天），防止表无限膨胀。
+            // 清理失败不影响启动，单独 try/catch。
+            try
+            {
+                int retention = Math.Max(1, _settings.RetentionDays);
+                _database.DeleteEventsBefore(DateTime.UtcNow.AddDays(-retention));
+            }
+            catch { /* 清理失败不影响启动 */ }
+
             _engine = new SentinelEngine(_database, PathFilter.CreateDefault(), new SelfGuard(dataDir), _logger);
             _engine.EventCommitted += OnEngineEventCommitted;   // 注意：后台线程回调！
             _engine.MessageRaised += OnEngineMessage;

@@ -70,10 +70,13 @@ public sealed class PathFilter
         return false;
     }
 
+    /// <summary>编译后的正则缓存（审查修复：每条事件都重新编译正则纯属浪费，缓存起来）。</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Regex> _regexCache = new();
+
     /// <summary>
     /// 通配符匹配：* 代表任意多个字符，? 代表任意一个字符。
     /// Windows 文件名不区分大小写，所以这里用“忽略大小写”的比较。
-    /// 实现技巧：把通配符表达式转换成正则表达式来匹配。
+    /// 实现技巧：把通配符表达式转换成正则表达式来匹配（结果缓存在 _regexCache）。
     /// </summary>
     /// <param name="pattern">通配符规则</param>
     /// <param name="text">被检查的文本（完整路径或文件名）</param>
@@ -89,10 +92,10 @@ public sealed class PathFilter
             .Replace(@"\*", ".*")
             .Replace(@"\?", ".");
 
-        var regex = matchWholeText
-            ? "^" + body + "$"
-            : @"(^|\\)" + body + "$";   // 匹配点必须是路径开头，或紧跟一个“\”，避免误伤 mybuild 这类名字
+        var regex = _regexCache.GetOrAdd(
+            (matchWholeText ? "^" : @"(^|\\)") + body + (matchWholeText ? "$" : ""),
+            static k => new Regex(k, RegexOptions.IgnoreCase | RegexOptions.Compiled));
 
-        return Regex.IsMatch(text, regex, RegexOptions.IgnoreCase);
+        return regex.IsMatch(text);
     }
 }
