@@ -30,14 +30,22 @@ public sealed class EventDebouncer
     /// <summary>一条正在等待合并的修改事件。</summary>
     private sealed class PendingChanged
     {
+        /// <summary>创建等待项：最早的那条记录 + 两个时间戳起点相同。</summary>
+        public PendingChanged(FileEventRecord record, DateTime timeUtc)
+        {
+            Record = record;
+            FirstUtc = timeUtc;
+            LastUtc = timeUtc;
+        }
+
         /// <summary>窗口里最早的那条记录（输出它就代表这一串修改）。</summary>
-        public FileEventRecord Record;
+        public FileEventRecord Record { get; }
 
         /// <summary>这串修改最早发生的时间。</summary>
-        public DateTime FirstUtc;
+        public DateTime FirstUtc { get; }
 
-        /// <summary>最近一次修改的时间（用来判断“安静了多久”）。</summary>
-        public DateTime LastUtc;
+        /// <summary>最近一次修改的时间（窗口里再来新事件时会刷新，用来判断“安静了多久”）。</summary>
+        public DateTime LastUtc { get; set; }
     }
 
     public EventDebouncer(TimeSpan? window = null, TimeSpan? maxDelay = null)
@@ -69,12 +77,7 @@ public sealed class EventDebouncer
             else
             {
                 // 这条路径第一次进入窗口：登记起来等待
-                _pending[key] = new PendingChanged
-                {
-                    Record = record,
-                    FirstUtc = nowUtc,
-                    LastUtc = nowUtc
-                };
+                _pending[key] = new PendingChanged(record, nowUtc);
             }
             return Array.Empty<FileEventRecord>();
         }

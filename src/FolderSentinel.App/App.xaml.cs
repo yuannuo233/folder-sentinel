@@ -1,6 +1,11 @@
 using System.Windows;
 using System.Windows.Threading;
 
+// 本项目同时启用了 WPF 和 WinForms（托盘图标用），
+// 两边都有 Application 和 MessageBox，用别名明确指定用 WPF 的版本。
+using Application = System.Windows.Application;
+using MessageBox = System.Windows.MessageBox;
+
 namespace FolderSentinel.App;
 
 /// <summary>

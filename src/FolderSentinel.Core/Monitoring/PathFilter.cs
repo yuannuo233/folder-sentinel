@@ -52,11 +52,15 @@ public sealed class PathFilter
         var fileName = System.IO.Path.GetFileName(fullPath);
         foreach (var pattern in _patterns)
         {
-            // 规则里带“\”或“/”的（例如 build\*.log），按完整路径匹配；
-            // 不带的（例如 *.tmp），只按文件名匹配。
-            var hit = pattern.Contains('\\') || pattern.Contains('/')
-                ? WildcardMatches(pattern, fullPath)
-                : WildcardMatches(pattern, fileName);
+            // 把规则里的“/”统一成 Windows 的“\”，两种写法都支持
+            var normalizedPattern = pattern.Replace('/', '\\');
+
+            // 规则里带“\”的（例如 build\*.log），按完整路径的后缀匹配；
+            // 不带的（例如 *.tmp），只按文件名整体匹配。
+            var hasDirectoryPart = normalizedPattern.Contains('\\');
+            var hit = hasDirectoryPart
+                ? WildcardMatches(normalizedPattern, fullPath, matchWholeText: false)
+                : WildcardMatches(normalizedPattern, fileName, matchWholeText: true);
 
             if (hit)
             {
@@ -71,12 +75,24 @@ public sealed class PathFilter
     /// Windows 文件名不区分大小写，所以这里用“忽略大小写”的比较。
     /// 实现技巧：把通配符表达式转换成正则表达式来匹配。
     /// </summary>
-    private static bool WildcardMatches(string pattern, string text)
+    /// <param name="pattern">通配符规则</param>
+    /// <param name="text">被检查的文本（完整路径或文件名）</param>
+    /// <param name="matchWholeText">
+    /// true = 文本要和规则“整体一模一样”（按文件名匹配时用）；
+    /// false = 只要求是“后缀匹配”，且匹配点必须紧跟在目录分隔符之后
+    /// （按完整路径匹配时用，例如规则 build\*.log 要命中 C:\proj\build\x.log）
+    /// </param>
+    private static bool WildcardMatches(string pattern, string text, bool matchWholeText)
     {
         // Regex.Escape 会把正则特殊字符转义；然后我们把被转义的 \* 换成“任意长度”、\? 换成“任意单字符”。
-        var regex = "^" + Regex.Escape(pattern)
-                          .Replace(@"\*", ".*")
-                          .Replace(@"\?", ".") + "$";
+        var body = Regex.Escape(pattern)
+            .Replace(@"\*", ".*")
+            .Replace(@"\?", ".");
+
+        var regex = matchWholeText
+            ? "^" + body + "$"
+            : @"(^|\\)" + body + "$";   // 匹配点必须是路径开头，或紧跟一个“\”，避免误伤 mybuild 这类名字
+
         return Regex.IsMatch(text, regex, RegexOptions.IgnoreCase);
     }
 }

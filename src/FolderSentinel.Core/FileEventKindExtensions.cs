@@ -1,3 +1,5 @@
+using FolderSentinel.Core.Models;
+
 namespace FolderSentinel.Core;
 
 /// <summary>

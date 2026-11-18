@@ -1,3 +1,4 @@
+using Xunit;
 using FolderSentinel.Core.Monitoring;
 
 namespace FolderSentinel.Tests;

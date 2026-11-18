@@ -1,3 +1,4 @@
+using Xunit;
 using FolderSentinel.Core;
 using FolderSentinel.Core.Monitoring;
 using FolderSentinel.Core.Storage;
@@ -95,12 +96,15 @@ public class SelfGuardTests
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "FolderSentinelSelf_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
+        // 注意：要添加的“不存在的目录”必须放在数据目录“外面”，
+        // 否则先触发的是防自记录检查（SelfWatchException）而不是“目录不存在”
+        var missingDir = Path.Combine(Path.GetTempPath(), "FolderSentinelMissing_" + Guid.NewGuid().ToString("N"));
         try
         {
             using var db = new EventDatabase(Path.Combine(tempDir, "t.db"));
             using var engine = new SentinelEngine(db, PathFilter.CreateDefault(), new SelfGuard(tempDir));
 
-            Assert.Throws<WatchDirectoryNotFoundException>(() => engine.AddDirectory(Path.Combine(tempDir, "不存在的目录")));
+            Assert.Throws<WatchDirectoryNotFoundException>(() => engine.AddDirectory(missingDir));
         }
         finally
         {

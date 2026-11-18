@@ -143,13 +143,15 @@ public sealed class SentinelEngine : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         var normalized = NormalizeDirectoryPath(path);
 
-        if (!Directory.Exists(normalized))
-        {
-            throw new WatchDirectoryNotFoundException(normalized);
-        }
+        // 先查“是不是程序自己的数据目录”（防自记录是最高优先级的安全检查），
+        // 再查目录是否存在。
         if (_selfGuard.IsOwnDataPath(normalized))
         {
             throw new SelfWatchException(normalized);
+        }
+        if (!Directory.Exists(normalized))
+        {
+            throw new WatchDirectoryNotFoundException(normalized);
         }
 
         _database.UpsertDirectory(normalized, enabled: true);

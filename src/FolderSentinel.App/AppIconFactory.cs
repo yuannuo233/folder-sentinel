@@ -5,6 +5,15 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
+// WPF 和 GDI+（画图标的 System.Drawing）里有些类重名（Color、Pen 等），
+// 用别名明确指定：画图标用的是 GDI+ 的那一套。
+using Bitmap = System.Drawing.Bitmap;
+using Color = System.Drawing.Color;
+using Graphics = System.Drawing.Graphics;
+using Icon = System.Drawing.Icon;
+using Pen = System.Drawing.Pen;
+using SolidBrush = System.Drawing.SolidBrush;
+
 namespace FolderSentinel.App;
 
 /// <summary>

@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace FolderSentinel.Core.Logging;
 
 /// <summary>

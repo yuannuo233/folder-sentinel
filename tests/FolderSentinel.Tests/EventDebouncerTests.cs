@@ -1,3 +1,4 @@
+using Xunit;
 using FolderSentinel.Core.Models;
 using FolderSentinel.Core.Monitoring;
 
