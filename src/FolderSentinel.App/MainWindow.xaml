@@ -1,0 +1,124 @@
+<Window x:Class="FolderSentinel.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title=""
+        Height="640" Width="1040" MinHeight="480" MinWidth="760"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI, Microsoft YaHei UI"
+        FontSize="13"
+        Background="#F9F9F9">
+
+    <!--
+        界面设计说明（原生 Windows 工具风格）：
+        - 紧凑布局、高信息密度：顶部工具条 + 左目录/右事件流 + 底部状态栏；
+        - 灰白中性底色，只有对勾图标用一点克制的蓝色，没有渐变和大圆角；
+        - 所有可见文字都在后台代码里通过 Loc 翻译字典设置（支持中英双语切换），
+          所以这里的 XAML 里看不到写死的文字；
+        - 唯一例外是语言选择框里的“简体中文 / English”——每种语言的名字
+          永远用它自己的语言显示，这是通用惯例，不走翻译字典。
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============ 第 1 行：顶部工具条 ============ -->
+        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#E2E2E2" BorderThickness="0,0,0,1" Padding="10,7">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="FilterLabel" VerticalAlignment="Center"/>
+                    <TextBox x:Name="FilterBox" Width="200" VerticalContentAlignment="Center"
+                             Margin="6,0,0,0" TextChanged="FilterBox_TextChanged"/>
+                    <TextBlock x:Name="HistoryLabel" VerticalAlignment="Center" Margin="18,0,0,0"/>
+                    <DatePicker x:Name="HistoryDatePicker" Width="130" Margin="6,0,0,0"
+                                SelectedDateChanged="HistoryDatePicker_SelectedDateChanged"/>
+                    <Button x:Name="BackToLiveButton" Click="BackToLiveButton_Click" Margin="10,0,0,0" Padding="12,3"/>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <TextBlock x:Name="LanguageLabel" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="LanguageBox" Width="110" Margin="6,0,0,0"
+                              SelectionChanged="LanguageBox_SelectionChanged">
+                        <ComboBoxItem Tag="zh-CN">简体中文</ComboBoxItem>
+                        <ComboBoxItem Tag="en-US">English</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ============ 第 2 行：主体（左目录 / 右事件流） ============ -->
+        <Grid Grid.Row="1" Margin="10,8,10,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="270"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧：监控目录管理 -->
+            <GroupBox x:Name="DirGroup" Grid.Column="0" Padding="6">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button x:Name="AddDirButton" Click="AddDirButton_Click" Padding="10,3" Margin="0,0,8,0"/>
+                        <Button x:Name="RemoveDirButton" Click="RemoveDirButton_Click" Padding="10,3"/>
+                    </StackPanel>
+                    <ListBox x:Name="DirectoryList" Background="White" BorderBrush="#D6D6D6">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <!-- 勾选 = 监控该目录；取消勾选 = 暂停监控。
+                                     两个绑定：Content 显示目录路径，IsChecked 绑定启用状态 -->
+                                <CheckBox Content="{Binding Path}"
+                                          IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                          Margin="0,2" VerticalContentAlignment="Center"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </GroupBox>
+
+            <!-- 中缝：可以左右拖动，调整两栏宽度 -->
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="Transparent"/>
+
+            <!-- 右侧：实时事件流 / 历史回看（同一个表格，切换数据源） -->
+            <GroupBox x:Name="EventsGroup" Grid.Column="2" Padding="6">
+                <DataGrid x:Name="EventGrid"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          SelectionMode="Single"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#EAEAEA"
+                          Background="White"
+                          BorderBrush="#D6D6D6"
+                          EnableRowVirtualization="True"
+                          ItemsSource="{Binding LiveRows}">
+                    <DataGrid.Columns>
+                        <!-- 时间列：右对齐 + 等宽字体，时间变化时数字上下对齐，好扫读 -->
+                        <DataGridTextColumn x:Name="TimeColumn" Binding="{Binding Time}" Width="168">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="Consolas"/>
+                                    <Setter Property="TextAlignment" Value="Right"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn x:Name="KindColumn" Binding="{Binding Kind}" Width="64"/>
+                        <DataGridTextColumn x:Name="PathColumn" Binding="{Binding Path}" Width="*"/>
+                        <DataGridTextColumn x:Name="ProcessColumn" Binding="{Binding Process}" Width="96"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </GroupBox>
+        </Grid>
+
+        <!-- ============ 第 3 行：状态栏（左状态 / 右计数） ============ -->
+        <Border Grid.Row="2" Background="#F0F0F0" BorderBrush="#E2E2E2" BorderThickness="0,1,0,0" Padding="10,4">
+            <DockPanel LastChildFill="True">
+                <TextBlock x:Name="CounterText" DockPanel.Dock="Right" FontFamily="Consolas"
+                           VerticalAlignment="Center" Margin="16,0,0,0"/>
+                <TextBlock x:Name="StatusText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
