@@ -17,7 +17,9 @@
 - 🎯 Debounced and noise-filtered: temp files like `*.tmp` and `~$*` are ignored automatically, duplicate events merged
 - 🛡️ Self-exclusion guard: the app never records itself (no runaway loops); minimize to tray to keep watching in the background
 
-## Usage in three steps
+## Download & Usage in three steps
+
+Download the latest `FolderSentinel-v0.1.0-win-x64.zip` from [Releases](../../releases) and extract it (single file, no installer), then:
 
 1. Launch the app, click **Add folder** on the left and pick a folder to watch.
 2. Any change made by any program shows up instantly in the list on the right.
