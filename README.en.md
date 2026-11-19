@@ -37,3 +37,9 @@ dotnet publish src/FolderSentinel.App -c Release -r win-x64 --self-contained tru
 
 > 🔒 **Privacy**: all data stays in the `data\` folder next to the executable (SQLite database + log). Nothing is uploaded; delete the folder and it's gone for good.
 > 📖 For how it works and known limitations (e.g. per-process attribution arrives in v0.2 via ETW), read the source — every file is commented in Chinese. Released under the [MIT](LICENSE) license.
+
+## Feedback / Get help
+
+Found a bug or have a suggestion? Please open an **[Issue](../../issues)** on this repository — I'll reply there. Including your Windows version, reproduction steps, and a screenshot helps me pinpoint it faster.
+
+> 💡 Why Issues? Questions and answers stay public — the next person with the same problem can find the answer by searching, so we build a shared manual together.
